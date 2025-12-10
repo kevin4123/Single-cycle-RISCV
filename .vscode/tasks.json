@@ -1,0 +1,17 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    /* ---------- GtkWave---------- */
+	{
+		"label": "GtkWave",
+		"type": "shell",
+		"command": "gtkwave",
+		"args": [
+			"tb.vcd",
+		],
+		"group": "none",
+		"problemMatcher": [],
+		"detail": "Opens the GtkWave waveform viewer.",
+	},
+  ]
+}
