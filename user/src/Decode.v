@@ -15,9 +15,15 @@ module Decode(
     output wire [3:0]    ALU_op,
     output wire          aluSrcB,
     output wire          store,
-    output wire          load
+    output wire          load,
+    output wire          csr,
+    output wire          exception,
+    output wire [31:0]   cause,
+
+    output uret
     
 );
+    wire lui,auipc,jal,itype,rtype;
 
 // instruction fields
     wire [6:0] opcode;
@@ -50,7 +56,6 @@ module Decode(
                     btype ? b_imm : 0; 
 
 // instruction identification
-    wire lui,auipc,jal,itype,rtype;
     assign lui = opcode == 7'b0110111 ? 1'b1 : 1'b0;
     assign auipc = opcode == 7'b0010111 ? 1'b1 : 1'b0;
     assign jal = opcode == 7'b1101111 ? 1'b1 : 1'b0;
@@ -60,18 +65,34 @@ module Decode(
     assign rtype = opcode == 7'b0110011 ? 1'b1 : 1'b0; 
     assign store = opcode == 7'b0100011 ? 1'b1 : 1'b0; 
     assign load = opcode == 7'b0000011 ? 1'b1 : 1'b0;
+
+    wire system,ebreak,ecall;
+
+    assign system = opcode == 7'b1110011 ? 1'b1 : 1'b0;
+    assign csr = system && (funct3 != 3'b000);
+    assign ecall = system && (funct3 == 3'b000) && (rs2 == 0);
+    assign ebreak = system && (funct3 == 3'b000) && (rs2 == 1);
+    assign uret = system && (funct3 == 3'b000) && (rs2 == 2);
     
 // control signals
-    assign wreg = (lui || auipc || jal || jalr || itype || rtype || load) ? 1 : 0;
+    assign wreg = (lui || auipc || jal || jalr || itype || rtype || load || csr) ? 1 : 0;
     assign wregSrc = lui ? 0 :
                         auipc ? 1 :
                         (jal || jalr) ? 2 : 
-                        (itype || rtype) ? 3 : 3; 
+                        (itype || rtype || csr) ? 3 : 3; 
     assign pcSrc = (jal || jalr) ? 1 : 0;
 
     assign ALU_op = (rtype || (itype && funct3 == 3'b101)) ? {funct7[5], funct3} : 
                     itype ? {1'b0, funct3} : 0 ;
     assign aluSrcB = (itype || load || store) ? 1 : 0;
 
-endmodule //Decode
+    wire illegal_inst;
+    assign illegal_inst = ~(lui || auipc || jal || jalr || btype || load || store || itype || rtype || system);
 
+    assign exception = illegal_inst || ecall || ebreak ;
+
+    assign cause = illegal_inst ? 2 : 
+                    ebreak ? 3 : 
+                    ecall ? 8 : 0; 
+
+endmodule //Decode
